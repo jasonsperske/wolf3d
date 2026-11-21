@@ -1,11 +1,13 @@
 module Main (main) where
 
-import Control.Monad (forM_, unless)
+import Control.Monad (forM_, unless, when)
 import qualified Data.ByteString as B
 import Data.Array (bounds, (!))
 import System.Environment (getArgs)
 import System.Exit (die)
 import Wolf.Assets
+import Wolf.Pack
+import Wolf.Media
 import Wolf.Types
 import Wolf.Level
 import Wolf.Simulation
@@ -71,7 +73,7 @@ main = do
   assert "map name" (mapName raw=="Synthetic")
   assert "row-major coordinates" (tiles l ! (3,1)==Door && tiles l ! (1,3)==Floor)
   assert "player direction" (spawn l==Vec 1.5 1.5 && spawnAngle l==(-pi/2))
-  assert "actor location" (guardSpawns l==[Vec 2.5 1.5])
+  assert "actor location" (guardSpawns l==[(Vec 2.5 1.5,50)])
   let w = (initialWorld l) {player=Vec 4.5 2.5, angle=(-pi/2)}
   assert "elevator is solid" (solidAt w (4,1))
   assert "using elevator wins" (outcome (step (1/60) (noInput {use=True}) w)==Won)
@@ -84,9 +86,13 @@ main = do
 
 integration :: FilePath -> IO ()
 integration dir = do
+  pack <- findPack dir >>= either die pure
   (header,game) <- readMapFiles dir >>= either die pure
+  swapBytes <- readResource pack "VSWAP" >>= either die pure
+  swap <- either die pure (decodeSwap swapBytes)
+  graphics <- either die pure (decodeGraphics swap)
   numbers <- either die pure (availableMaps header)
-  assert "ten shareware maps" (numbers==[1..10])
+  when (packExtension pack=="WL1") $ assert "ten shareware maps" (numbers==[1..10])
   -- Weighted plane checksums and spawns independently decoded from the supplied
   -- December 1992 WL1 files. These integration goldens are version-specific.
   let expected =
@@ -96,12 +102,16 @@ integration dir = do
          (639663768,43796286,(40,44)), (452429339,39483919,(34,58)),
          (255287290,5124682,(34,58)), (565534596,47240131,(5,38))]
       checksum ws = sum (zipWith (*) [1::Integer ..] (map toInteger ws))
-  forM_ (zip numbers expected) $ \(n,(geometrySum,objectSum,start)) -> do
+  forM_ numbers $ \n -> do
     raw <- either die pure (decodeMap header game n)
-    assert ("plane checksums "++show n) (map checksum (mapPlanes raw)==[geometrySum,objectSum,0])
+
     l <- either die pure (toLevel raw)
     assert "64x64 tile array" (bounds (tiles l)==((0,0),(63,63)))
-    assert "original player location" (cell (spawn l)==start)
+    when (packExtension pack=="WL1") $ case drop (n-1) expected of
+      (geometrySum,objectSum,start):_ -> do
+        assert ("plane checksums "++show n) (map checksum (mapPlanes raw)==[geometrySum,objectSum,0])
+        assert "original player location" (cell (spawn l)==start)
+      _ -> die "Unexpected shareware map number"
     assert "valid player footprint" (canStand (initialWorld l) (spawn l))
-    writePPM ("build/shareware-"++show n++".ppm") (initialWorld l)
+    writePPMWith (Just graphics) ("build/shareware-"++show n++".ppm") (initialWorld l)
     putStrLn ("Verified "++mapName raw)

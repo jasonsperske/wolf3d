@@ -2,10 +2,12 @@
  * One owner and one cleanup path keep this deliberately small FFI auditable. */
 #include <SDL.h>
 #include <stdint.h>
+void audio_close(void);
 static SDL_Window *window;
 static SDL_Renderer *renderer;
 static SDL_Texture *texture;
 void platform_close(void) {
+    audio_close();
     SDL_DestroyTexture(texture); texture = NULL;
     SDL_DestroyRenderer(renderer); renderer = NULL;
     SDL_DestroyWindow(window); window = NULL;

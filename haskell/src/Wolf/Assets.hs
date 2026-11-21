@@ -5,8 +5,9 @@ module Wolf.Assets
   ( MapData(..), readMapFiles, availableMaps, decodeMap, toLevel
   , carmackExpand, rlewExpand ) where
 
-import Control.Exception (IOException, try)
-import Control.Monad (unless, forM)
+import Control.Monad (forM)
+import Wolf.Binary
+import Wolf.Pack
 import Data.Array (array)
 import qualified Data.ByteString as B
 import Data.Char (chr)
@@ -22,38 +23,17 @@ data MapData = MapData
 
 readMapFiles :: FilePath -> IO (Either String (B.ByteString, B.ByteString))
 readMapFiles dir = do
-  result <- try $ (,) <$> B.readFile (dir++"/MAPHEAD.WL1") <*> B.readFile (dir++"/GAMEMAPS.WL1")
-  pure $ case result of
-    Left e -> Left ("Cannot read shareware maps: "++show (e :: IOException))
-    Right files -> Right files
-
-check :: Bool -> String -> Either String ()
-check condition message = unless condition (Left message)
-
-slice :: B.ByteString -> Int -> Int -> Either String B.ByteString
-slice bytes offset count = do
-  check (offset>=0 && count>=0 && offset<=B.length bytes && count<=B.length bytes-offset)
-    ("Truncated data or invalid range at byte "++show offset)
-  pure (B.take count (B.drop offset bytes))
-
-byte :: B.ByteString -> Int -> Either String Int
-byte bytes i = do
-  chunk <- slice bytes i 1
-  pure (fromIntegral (B.index chunk 0))
-
-word16 :: B.ByteString -> Int -> Either String Int
-word16 bytes i = (+) <$> byte bytes i <*> ((256*) <$> byte bytes (i+1))
-
--- Use Integer while decoding file offsets, before converting to machine Int.
-word32 :: B.ByteString -> Int -> Either String Integer
-word32 bytes i = do
-  lo <- word16 bytes i
-  hi <- word16 bytes (i+2)
-  pure (toInteger lo + 65536*toInteger hi)
+  found <- findPack dir
+  case found of
+    Left err -> pure (Left err)
+    Right pack -> do
+      header <- readResource pack "MAPHEAD"
+      game <- readResource pack "GAMEMAPS"
+      pure ((,) <$> header <*> game)
 
 availableMaps :: B.ByteString -> Either String [Int]
 availableMaps header = do
-  check (B.length header == 402) "MAPHEAD.WL1 must contain a tag and 100 offsets (402 bytes)"
+  check (B.length header == 402) "MAPHEAD must contain a tag and 100 offsets (402 bytes)"
   offsets <- mapM (word32 header . (2+) . (4*)) [0..99]
   pure [i | (i,o)<-zip [1..] offsets, o/=0 && o/=4294967295]
 
@@ -118,16 +98,16 @@ decodeMap header game number = do
   check (number `elem` present) ("Map "++show number++" is absent (use --list-levels)")
   tag <- word16 header 0
   offset <- word32 header (2+4*(number-1))
-  check (offset<=toInteger (B.length game)) "Map header offset is outside GAMEMAPS.WL1"
+  check (offset<=toInteger (B.length game)) "Map header offset is outside GAMEMAPS"
   info <- slice game (fromInteger offset) 38
   width <- word16 info 18
   height <- word16 info 20
-  check (width==64 && height==64) "Only 64x64 shareware maps are supported"
+  check (width==64 && height==64) "Only 64x64 Wolfenstein maps are supported"
   nameBytes <- slice info 22 16
   planes <- forM [0..2] $ \p -> do
     start <- word32 info (4*p)
     size <- word16 info (12+2*p)
-    check (start<=toInteger (B.length game)) "Plane offset is outside GAMEMAPS.WL1"
+    check (start<=toInteger (B.length game)) "Plane offset is outside GAMEMAPS"
     compressed <- slice game (fromInteger start) size
     expanded <- carmackExpand compressed
     rlewExpand tag (width*height) expanded
@@ -152,7 +132,13 @@ toLevel raw = do
                  | n==21 = Elevator
                  | n==106 || n>=107 = Floor -- ambush marker and area codes
                  | otherwise = Wall
-          enemy o = (o>=108 && o<=123) || (o>=126 && o<=141) || o==214
+          enemy o
+            | o>=108 && o<=115 = Just 50
+            | o>=116 && o<=123 = Just 238
+            | o>=126 && o<=133 = Just 138
+            | o>=134 && o<=141 = Just 99
+            | o>=216 && o<=223 = Just 188
+            | otherwise = lookup o [(214,296),(197,385),(215,360),(179,395),(196,307),(160,319),(178,334)]
       -- Some shipped maps contain area codes at the boundary. Preserve them;
       -- tileAt treats everything beyond the array as solid, so DDA still stops.
       case starts of
@@ -160,6 +146,8 @@ toLevel raw = do
           check (any (\(q,n,_) -> q==p && tile n==Floor) entries) "Player start is not on floor"
           pure (Level (array ((0,0),(width-1,height-1)) [(q,tile n) | (q,n,_)<-entries])
             (center p) (fromIntegral (direction-20)*pi/2)
-            [center q | (q,_,o)<-entries, enemy o])
+            [(center q,sprite) | (q,_,o)<-entries, Just sprite<-[enemy o]]
+            (Just (array ((0,0),(width-1,height-1)) [(q,n) | (q,n,_)<-entries]))
+            [(center q,o-23+2) | (q,_,o)<-entries, o>=23 && o<=70])
         _ -> Left "Map must contain exactly one player start"
     _ -> Left "Map must contain three planes"

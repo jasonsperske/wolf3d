@@ -15,7 +15,7 @@ parseLevel rows
   | length starts /= 1 = Left "Map needs exactly one P"
   | not (any ((=='E') . snd) cells) = Left "Map needs an exit E"
   | otherwise = case starts of
-      [p] -> Right (Level (array ((0,0),(w-1,h-1)) [(i,tile c) | (i,c)<-cells]) p 0 enemies)
+      [p] -> Right (Level (array ((0,0),(w-1,h-1)) [(i,tile c) | (i,c)<-cells]) p 0 [(e,50) | e<-enemies] Nothing [])
       _ -> Left "Map needs exactly one P"
   where
     h = length rows
@@ -48,7 +48,7 @@ demoLevel = parseLevel
 
 initialWorld :: Level -> World
 initialWorld l = World l (spawn l) (spawnAngle l) 100 M.empty
-  [Guard p Idle 0 | p<-guardSpawns l] 0 0 Playing
+  [Guard p Idle 0 sprite | (p,sprite)<-guardSpawns l] 0 0 Playing
 
 tileAt :: Level -> (Int,Int) -> Tile
 tileAt l p | inRange (bounds (tiles l)) p = tiles l ! p

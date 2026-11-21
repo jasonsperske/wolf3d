@@ -1,4 +1,4 @@
-# Loading the shareware maps
+# Loading the Wolfenstein maps
 
 `Wolf.Assets` implements the map path described by the original repository's `ID_CA.C` (`CA_CacheMap`, `CAL_CarmackExpand`, `CA_RLEWexpand`) and `WL_GAME.C` (`ScanInfoPlane`, `SetupGameLevel`). The loader reads local files; it does not need an asset download or a new Haskell package.
 
@@ -14,7 +14,7 @@ toLevel   :: MapData -> Either String Level
 Decoding preserves the original data. Translation chooses how much the teaching game understands. An unimplemented object does not disappear from the decoded representation merely because it has no gameplay counterpart yet.
 
 1. `MAPHEAD.WL1` contains a little-endian 16-bit RLEW marker followed by 100 little-endian 32-bit map offsets into `GAMEMAPS.WL1`. Zero and `0xffffffff` mean absent maps. The command-line map number is one-based.
-2. Each selected map header has three 32-bit plane offsets, three 16-bit compressed plane lengths, 16-bit width and height, and a 16-byte zero-terminated name. Only 64×64 WL1 maps are accepted here.
+2. Each selected map header has three 32-bit plane offsets, three 16-bit compressed plane lengths, 16-bit width and height, and a 16-byte zero-terminated name. Only 64×64 WL1/WL6 maps are accepted here.
 3. Each compressed plane begins with its Carmack-expanded size in **bytes**. The remaining bytes expand to a stream of 16-bit words.
 4. That word stream begins with the RLEW-expanded size in **bytes**. After RLEW expansion, each plane contains exactly 4096 words, ordered row by row (`y * width + x`).
 5. Plane 0 contains walls, doors, areas, and special geometry. Plane 1 contains the player and objects. Plane 2 is retained even though the teaching engine does not use it.
@@ -45,10 +45,10 @@ These guarantees apply to decoding. A structurally valid map is not necessarily 
 | Geometry 107 and above | Area floor; area-connectivity behavior is not simulated |
 | Other geometry | Solid wall |
 | Object 19–22 | North/east/south/west player start, translated to our clockwise radian angle |
-| Object 108–123, 126–141 | Easy-difficulty guard/officer/SS/dog positions, represented as generic guards |
-| Object 214 | Boss position, represented as a generic guard |
+| Object 108–123, 126–141 | Easy-difficulty guard/officer/SS/dog positions, using simplified guard behavior and original sprite identities |
+| Object 214 | Boss position, using simplified guard behavior and its original sprite identity |
 | Higher-difficulty enemy additions | Ignored; the importer uses easy placement |
-| Decorations, pickups, patrol arrows | Retained in raw data, ignored by current gameplay |
+| Decorations, pickups, patrol arrows | Decorations/pickups rendered as sprites, gameplay effects ignored |
 | Pushwall object marker | Wall remains fixed; no secret-wall movement |
 
 `toLevel` requires exactly one player, a floor spawn, and correct plane sizes. Some shipped maps contain area codes at the boundary, so unlike the text demo parser it does not require every boundary cell to be a wall. The existing `tileAt` treats positions outside the array as solid, keeping collision and rays bounded. It does not require an elevator, because the boss floor uses different original completion logic. The renderer derives minimap dimensions from the tile array; 64×64 levels are shown at one pixel per cell.
@@ -57,6 +57,6 @@ These guarantees apply to decoding. A structurally valid map is not necessarily 
 
 `make test` runs synthetic literal, escaped-tag, overlapping near/far copy, RLEW, malformed-size, truncation, invalid-reference, header, coordinate, spawn-facing, and elevator checks, plus the existing game tests. Its synthetic full map is constructed in code, so no original assets are needed.
 
-`make test-assets` additionally loads the user's `../wolf3dsw` files. It verifies all ten maps, all three plane checksums, known player coordinates, valid spawn footprints, and rendering. It writes ten inspectable PPM images to `build/`. Override the directory with `make test-assets ASSET_DIR=/path/to/wolf3dsw`. The checksum goldens were independently decoded from the supplied December 1992 files; another shareware revision can decode correctly but fail these revision-specific checks.
+`make test-assets` additionally loads the user's `../assets/shareware` files. It verifies all ten maps, all three plane checksums, known player coordinates, valid spawn footprints, and rendering. It writes ten inspectable PPM images to `build/`. Override the directory with `make test-assets ASSET_DIR=/path/to/assets/shareware`. The checksum goldens were independently decoded from the supplied December 1992 files; another shareware revision can decode correctly but fail these revision-specific checks.
 
-Textures in `VSWAP`, sprite shapes, VGA UI resources, audio, collision for decorations, and faithful actor state machines are not part of this loader change. They can consume the preserved plane data in later extensions.
+Textures, sprite shapes, music, and effects are now loaded by the media modules; see [Media and bundling](MEDIA.md). VGA UI resources, decoration collision, and faithful actor state machines remain separate extensions.

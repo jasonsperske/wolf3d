@@ -34,11 +34,11 @@ Compact source can hide work. `sortOn` allocates and sorts every frame; `map` co
 
 ## The platform boundary adds friction
 
-The C adapter isolates SDL struct layouts and exposes a few scalar/pointer calls. Haskell's `bracket_` ties platform cleanup to normal exit and exceptions. No C code knows what a guard, wall, or hit point is. Packed pixels and a documented input bitmask make the boundary inspectable.
+The C adapters isolate SDL struct layouts and expose scalar/pointer calls. The expanded audio boundary also owns chip emulation, sample resampling, and mixing; Haskell decodes and validates resources and decides which sound IDs to play. Haskell's `bracket_` ties platform cleanup to normal exit and exceptions. No C code knows what a guard, wall, or hit point is. Packed pixels and a documented input bitmask make the boundary inspectable.
 
 The cost is two toolchains, matching C signatures, native headers, library discovery, and FFI lifetime rules. The compiler cannot verify that `platform_present` reads exactly the allocated number of pixels. `unsafe` FFI calls assume short native operations; presentation can wait for vsync and would deserve a `safe` call or dedicated presentation thread if Haskell concurrency were introduced. The game currently runs on one thread, so this is a deliberate minimal-shell choice.
 
-A Haskell SDL binding would eliminate the handwritten C adapter but add package/API concepts and dependency resolution. This edition prioritizes a Make build with GHC-bundled Haskell libraries. It is predominantly Haskell, not literally zero C.
+A Haskell SDL binding would eliminate the handwritten C adapter but add package/API concepts and dependency resolution. This edition prioritizes a Make build with GHC-bundled Haskell libraries and a pinned native OPL emulator. It is predominantly Haskell, not literally zero C.
 
 ## Numerical simplicity changes behavior
 

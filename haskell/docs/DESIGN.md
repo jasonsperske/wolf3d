@@ -2,6 +2,8 @@
 
 ## 1. Follow a single frame
 
+With an asset pack, `Main` first decodes maps and graphics, prepares original audio, and passes immutable graphics to `renderWith`. `soundEvents` derives sound IDs from each pure tick; the shell sends them to the mixer. Without a pack the procedural rendering path remains available. See [media and bundling](MEDIA.md).
+
 `Main.loop` reads SDL input into an `Input` record, measures elapsed time, and runs zero or more 1/60-second simulation steps. It renders the resulting `World`, copies packed pixels into an FFI buffer, and asks SDL to present them. The reusable pixel buffer is allocated outside the loop and cleaned up when the loop exits.
 
 The two central interfaces are:
@@ -39,7 +41,7 @@ ray     = forward + right * (0.66 * cameraX)
 
 The center-sampled `cameraX` ranges almost from -1 to +1. These rays deliberately are **not normalized**. Their forward component is one, so the returned parameter `t` is camera-perpendicular depth. Projected wall height is `160 / t`. Using Euclidean ray length here would create the familiar curved-wall/fisheye distortion. The camera plane factor 0.66 gives about a 67-degree horizontal field of view; vertical projection is independently chosen for the retro framebuffer.
 
-DDA also returns the wall side and fractional texture coordinate. The renderer synthesizes a brick pattern from that coordinate and the vertical position in the wall slice. Horizontal faces are shaded more darkly; depth reduces brightness. There is no texture file decoder to obscure this lesson.
+DDA also returns the wall side and fractional texture coordinate. The renderer synthesizes a brick pattern from that coordinate and the vertical position in the wall slice. Horizontal faces are shaded more darkly; depth reduces brightness. This procedural fallback keeps the demo self-contained. With assets loaded, `wallCodes` selects original VSWAP texture pages decoded by `Wolf.Media`.
 
 `visible` reuses DDA with a **normalized** direction. In that case `t` is Euclidean distance, which can be compared directly to the target distance.
 
@@ -63,7 +65,7 @@ The update returns each new guard plus its damage. Summing the damage avoids hid
 
 ## 6. Paint sprites and pixels
 
-Walls produce a per-column depth buffer. Each living guard is transformed into forward depth and lateral camera coordinates, then projected into a billboard. Sprites are drawn farthest first. Each column checks the wall depth before drawing, so walls correctly hide guards. A procedural silhouette replaces original artwork. Dead guards disappear.
+Walls produce a per-column depth buffer. Each living guard is transformed into forward depth and lateral camera coordinates, then projected into a billboard. Sprites are drawn farthest first. Each column checks the wall depth before drawing, so walls correctly hide guards. Without assets, procedural silhouettes replace artwork and dead guards disappear. With assets, transparent original sprites show actors, corpses, decorations, and the pistol.
 
 The framebuffer is an unboxed array of packed ARGB words. Constructing a fresh immutable array for every individual pixel write would be impractical. `runSTUArray` allows local in-place writes and returns an immutable result. Its type prevents the mutable reference escaping. This is real mutation with a restricted lifetime, not a promise that mutation is always unnecessary.
 

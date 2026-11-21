@@ -8,6 +8,7 @@ import Wolf.Level
 import Wolf.Raycast
 import Wolf.Simulation
 import Wolf.Render
+import Wolf.Audio
 
 assert :: String -> Bool -> IO ()
 assert label ok = unless ok (die ("FAIL: "++label))
@@ -48,6 +49,7 @@ main = do
   assert "closed door occludes guard" (not (visible d (player d) (Vec 4.5 1.5)))
   let opening = step (1/60) (noInput {use=True}) d
   assert "use starts opening" (M.lookup (2,1) (doors opening)==Just (Opening 0))
+  assert "opening emits door sound once" (18 `elem` soundEvents d opening && 18 `notElem` soundEvents opening (step (1/60) (noInput {use=True}) opening))
   assert "opening remains solid" (solidAt opening (2,1))
   let opened = ticks 40 noInput opening
   assert "door becomes traversable" (not (solidAt opened (2,1)))
@@ -57,8 +59,10 @@ main = do
   s <- fixture ["########", "#P.G.GE#", "########"]
   let fired = step (1/60) (noInput {fire=True}) s
   assert "only nearest guard hit" (map guardMode (guards fired)==[Dead,Chasing])
+  assert "shot emits original pistol sound" (24 `elem` soundEvents s fired)
   let again = step (1/60) (noInput {fire=True}) fired
   assert "weapon cooldown" (length (filter ((==Dead) . guardMode) (guards again))==1)
+  assert "cooldown does not re-emit pistol sound" (24 `notElem` soundEvents fired again)
   let killed = step (1/60) (noInput {fire=True}) (ticks 20 noInput fired)
   assert "dead guards do not block shots" (all ((==Dead) . guardMode) (guards killed))
   single <- fixture ["######", "#P.GE#", "######"]
