@@ -9,6 +9,10 @@ import Wolf.Types
 
 data AudioBank = AudioBank { musicTracks :: [B.ByteString], adlibSounds :: [B.ByteString] } deriving Show
 
+-- Format references: [MusicGroup](../../../WOLFSRC/ID_SD.H#L160),
+-- [SD_StartMusic](../../../WOLFSRC/ID_SD.C#L2309), and the C reference sequencer
+-- [SDL_ALService](../../../WOLFSRC/ID_SD.C#L1498) (inside #if 0 in this release).
+-- We validate the register/value/delay stream before the native mixer consumes it.
 decodeIMF :: B.ByteString -> Either String B.ByteString
 decodeIMF bytes = do
   size <- word16 bytes 0
@@ -20,6 +24,11 @@ decodeIMF bytes = do
   check (size==0 || any (>0) delays) "IMF must advance time"
   pure events
 
+-- C references: [CAL_SetupAudioFile](../../../WOLFSRC/ID_CA.C#L1026),
+-- [CA_CacheAudioChunk](../../../WOLFSRC/ID_CA.C#L1134), and
+-- [AdLibSound](../../../WOLFSRC/ID_SD.H#L133). The effect-count/27-track layouts
+-- are defined by [AUDIOWL1.H](../../../WOLFSRC/AUDIOWL1.H) and
+-- [AUDIOWL6.H](../../../WOLFSRC/AUDIOWL6.H); we select from directory size.
 decodeAudio :: B.ByteString -> B.ByteString -> Either String AudioBank
 decodeAudio header bytes = do
   check (B.length header `mod` 4==0) "Invalid AUDIOHED length"
@@ -37,6 +46,9 @@ decodeAudio header bytes = do
     slice b 0 (23+fromInteger len)
   pure (AudioBank music effects)
 
+-- Data reference: the [songs table](../../../WOLFSRC/WL_PLAY.C#L107), used by
+-- [StartMusic](../../../WOLFSRC/WL_PLAY.C#L1023). Track indices follow the audio
+-- headers above; the older 69-effect layout has a different march index.
 levelMusic :: AudioBank -> Int -> Int
 levelMusic bank number = table !! ((number-1) `mod` 60)
   where
@@ -48,6 +60,10 @@ levelMusic bank number = table !! ((number-1) `mod` 60)
 
 -- Event IDs use the stable first 69 sound numbers in AUDIOWL*.H. Extract once
 -- per simulation tick, so a slow rendered frame does not miss an entire shot.
+-- C call-site references: [GunAttack](../../../WOLFSRC/WL_AGENT.C#L1168),
+-- [TakeDamage](../../../WOLFSRC/WL_AGENT.C#L386), and
+-- [OpenDoor](../../../WOLFSRC/WL_ACT1.C#L400) call SD_PlaySound directly.
+-- Deriving events from successive immutable worlds is new to this edition.
 soundEvents :: World -> World -> [Int]
 soundEvents old new =
   [24 | muzzle new>muzzle old] ++

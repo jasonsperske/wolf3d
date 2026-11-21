@@ -3,6 +3,9 @@
 module Wolf.Palette (palette) where
 import Data.Array.Unboxed (UArray, listArray)
 import Data.Word (Word32)
+-- C consumer: [SignonScreen](../../../WOLFSRC/WL_MAIN.C#L727) passes gamepal to
+-- [VL_SetPalette](../../../WOLFSRC/ID_VL.C#L371). The palette data itself is in
+-- [GAMEPAL.OBJ](../../../WOLFSRC/OBJ/GAMEPAL.OBJ); this array replaces VGA DAC writes.
 palette :: UArray Int Word32
 palette = listArray (0,255)
   [0xff000000,0xff0000aa,0xff00aa00,0xff00aaaa,0xffaa0000,0xffaa00aa,0xffaa5500,0xffaaaaaa,

@@ -22,6 +22,10 @@ foreign import ccall unsafe "audio_start" start :: IO CInt
 foreign import ccall unsafe "audio_close" closeAudio :: IO ()
 foreign import ccall unsafe "audio_render" renderAudio :: Ptr Int16 -> CInt -> IO ()
 
+-- C counterparts: [SD_StartMusic](../../../WOLFSRC/ID_SD.C#L2309),
+-- [SDL_ALPlaySound](../../../WOLFSRC/ID_SD.C#L1433), and
+-- [SDL_SetupDigi](../../../WOLFSRC/ID_SD.C#L1235). Our resource transfer and OPL
+-- shared-library loading are new; original hardware/timer setup is not ported.
 prepareAudio :: AudioBank -> [B.ByteString] -> Int -> IO Bool
 prepareAudio bank samples levelNumber = do
   exe <- getExecutablePath
@@ -39,11 +43,16 @@ prepareAudio bank samples levelNumber = do
 
 startAudio :: IO Bool
 startAudio = (/=0) <$> start
+-- C counterpart: [SD_PlaySound](../../../WOLFSRC/ID_SD.C#L2123) dispatches a
+-- sound ID using [wolfdigimap](../../../WOLFSRC/WL_MAIN.C#L849). Our native
+-- audio_play performs the PCM/AdLib choice; original priorities/spatialization differ.
 playSounds :: [Int] -> IO ()
 playSounds = mapM_ (play . fromIntegral)
 
 -- Five seconds of the selected original song, then gameplay effects mixed in.
 -- Explicit little-endian WAV output works independently of host byte order.
+-- Teaching-only diagnostic: the original sound manager played hardware streams;
+-- this WAV export exercises the same mixer as the windowed game without a device.
 exportAudio :: FilePath -> IO ()
 exportAudio path = do
   chunks <- mapM chunk [0::Int ..4]

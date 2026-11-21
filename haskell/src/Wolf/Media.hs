@@ -19,6 +19,9 @@ data Graphics = Graphics { wallPictures :: M.Map Int Picture, spritePictures :: 
 pictureAt :: Picture -> Int -> Int -> Word32
 pictureAt pic x y = pic ! (max 0 (min 63 y)*64+max 0 (min 63 x))
 
+-- File-format reference: [PML_OpenPageFile](../../../WOLFSRC/ID_PM.C#L485).
+-- [PM_GetPage](../../../WOLFSRC/ID_PM.C#L877) documents sparse pages. This loader
+-- keeps ordinary in-memory bytes instead of the original EMS/XMS page cache.
 decodeSwap :: B.ByteString -> Either String Swap
 decodeSwap bytes = do
   count <- word16 bytes 0
@@ -36,6 +39,10 @@ decodeSwap bytes = do
 
 -- Sprite columns hold triples (endY*2, pixelBase, startY*2), terminated by 0.
 -- Source pixel index is pixelBase+y, NOT pixelBase+(y-startY).
+-- Format references: [t_compshape](../../../WOLFSRC/WL_DEF.H#L1077),
+-- [ScaleShape](../../../WOLFSRC/WL_SCALE.C#L421), and the inline-assembly
+-- [ScaleLine](../../../WOLFSRC/WL_SCALE.C#L249). They consume these command posts
+-- during scaling; we decode them once into transparent pixels, without code patching.
 decodeSprite :: B.ByteString -> Either String Picture
 decodeSprite bytes = do
   left <- word16 bytes 0
@@ -62,6 +69,9 @@ decodeSprite bytes = do
   let pixels = M.fromList (concat columns)
   pure (listArray (0,4095) [M.findWithDefault 0 i pixels | i<-[0..4095]])
 
+-- C references: [HitVertWall](../../../WOLFSRC/WL_DRAW.C#L477) consumes wall
+-- columns; [DOORWALL](../../../WOLFSRC/WL_DRAW.C#L19) locates the final eight wall
+-- pages. Sprite page-relative IDs come from the [sprite enum](../../../WOLFSRC/WL_DEF.H#L160).
 decodeGraphics :: Swap -> Either String Graphics
 decodeGraphics swap = do
   walls <- forM (zip [0..] (take (spriteStart swap) (pages swap))) $ \(i,p) ->
@@ -72,6 +82,9 @@ decodeGraphics swap = do
     if B.null p then pure [] else do pic <- decodeSprite p; pure [(i,pic)]
   pure (Graphics (M.fromList (concat walls)) (M.fromList (concat sprites)) (spriteStart swap-8))
 
+-- C references: [SDL_SetupDigi](../../../WOLFSRC/ID_SD.C#L1235) reads the last
+-- page's sound directory; [SD_PlayDigitized](../../../WOLFSRC/ID_SD.C#L1130)
+-- streams its page ranges. We assemble samples at load time and keep sparse slots.
 decodeDigitized :: Swap -> Either String [B.ByteString]
 decodeDigitized swap = case reverse (pages swap) of
   [] -> Left "Missing digitized sound directory"

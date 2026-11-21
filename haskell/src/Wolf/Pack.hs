@@ -11,6 +11,9 @@ import System.FilePath ((</>), takeDirectory, normalise)
 data AssetPack = AssetPack { packDirectory :: FilePath, packExtension :: String,
                              packFiles :: [FilePath] } deriving Show
 
+-- C file-naming reference: [CAL_SetupMapFile](../../../WOLFSRC/ID_CA.C#L942)
+-- appends the global edition extension. Runtime selection, case-insensitive
+-- matching, and mixed-pack rejection are additions of this teaching edition.
 findPack :: FilePath -> IO (Either String AssetPack)
 findPack dir = do
   result <- try (listDirectory dir) :: IO (Either IOException [FilePath])
@@ -30,6 +33,8 @@ readResource pack name = case find ((==name++"."++packExtension pack) . map toUp
 
 -- Bundled files win. Development prefers registered over shareware. An existing
 -- selected folder with bad data reports an error instead of silently changing games.
+-- No original C counterpart: executable-relative bundle discovery is new.
+-- It replaces the working-directory assumptions of the file-opening path above.
 discoverPack :: IO (Either String (Maybe AssetPack))
 discoverPack = do
   exe <- getExecutablePath

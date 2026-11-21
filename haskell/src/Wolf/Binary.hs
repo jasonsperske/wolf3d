@@ -1,3 +1,7 @@
+-- New safety helpers, not translated C routines. Compare the direct struct and
+-- word reads in [CAL_SetupMapFile](../../../WOLFSRC/ID_CA.C#L942) and
+-- [PML_OpenPageFile](../../../WOLFSRC/ID_PM.C#L485): explicit little-endian reads
+-- make host layout irrelevant and turn malformed ranges into Either errors.
 module Wolf.Binary (check, slice, byte, word16, word32) where
 import Control.Monad (unless)
 import qualified Data.ByteString as B

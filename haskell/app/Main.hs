@@ -57,6 +57,9 @@ parseOptions = go (Options Nothing 1 Play False False)
     go o ("--list-levels":rest) | mode o==Play = go (o {mode=ListLevels}) rest
     go _ _ = Left usage
 
+-- Startup counterpart: [SetupGameLevel](../../WOLFSRC/WL_GAME.C#L625).
+-- Command-line pack selection, headless modes, and explicit resource ownership
+-- are new shell code; they are not translations of the DOS startup/menu system.
 main :: IO ()
 main = do
   args <- getArgs
@@ -127,6 +130,9 @@ runMode selected resources w = case selected of
         platformClose
         die ("SDL initialization failed: "++err)
 
+-- Presentation counterpart: [ThreeDRefresh](../../WOLFSRC/WL_DRAW.C#L1336).
+-- The original combines drawing and VGA presentation; we keep pixel generation
+-- pure and send a completed buffer through the SDL adapter.
 present :: Maybe Graphics -> Ptr Word32 -> World -> IO ()
 present graphics buffer w = do
   pokeArray buffer (elems (renderWith graphics w))
@@ -137,6 +143,10 @@ present graphics buffer w = do
 
 -- Cap catch-up at 250 ms after a pause. The simulation always receives the same
 -- timestep; rendering can happen at any rate. Input is sampled once per frame.
+-- C counterparts: [PlayLoop](../../WOLFSRC/WL_PLAY.C#L1368),
+-- [PollControls](../../WOLFSRC/WL_PLAY.C#L455), and
+-- [CalcTics](../../WOLFSRC/WL_DRAW.C#L1236). The order is recognizable, but the
+-- accumulator uses fixed 60-Hz updates rather than the original variable tics.
 loop :: Maybe Graphics -> Bool -> Ptr Word32 -> World -> World -> Double -> Double -> IO ()
 loop graphics enabled buffer initial w previous remainder = do
   bits <- platformInput

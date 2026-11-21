@@ -27,6 +27,9 @@ rgb r g b = 0xff000000 .|. shiftL (fromIntegral r) 16 .|. shiftL (fromIntegral g
 render :: World -> UArray Int Word32
 render = renderWith Nothing
 
+-- C counterpart: [ThreeDRefresh](../../../WOLFSRC/WL_DRAW.C#L1336) draws walls,
+-- scaled actors, then the weapon. We retain that order but use an ST framebuffer
+-- instead of VGA planes and runtime-generated scaling routines.
 renderWith :: Maybe Graphics -> World -> UArray Int Word32
 renderWith graphics w = runSTUArray $ do
   buffer <- newArray (0,screenWidth*screenHeight-1) 0
@@ -36,6 +39,8 @@ renderWith graphics w = runSTUArray $ do
         forM_ [max 0 x..min (screenWidth-1) (x+width-1)] $ \i -> pixel i j c
   forM_ [0..screenHeight-1] $ \y ->
     rect 0 y screenWidth 1 (if y<100 then rgb 35 39 49 else rgb 58 53 46)
+  -- Projection reference: [CalcHeight](../../../WOLFSRC/WL_DRAW.C#L359).
+  -- Original fixed-point depth correction becomes perpendicular camera-ray depth.
   forM_ (zip [0..] rays) $ \(x,h) -> do
     let depth = max 0.05 (hitDistance h)
         height = min 4000 (floor (160/depth))
@@ -56,6 +61,10 @@ renderWith graphics w = runSTUArray $ do
         Nothing -> pixel x y (rgb (floor (r*shade)) (floor (g*shade)) (floor (b*shade)))
   -- All billboards share painter order and wall-depth clipping. Transparent
   -- sprite pixels never touch the framebuffer, preserving scenery behind them.
+  -- C references: [TransformActor](../../../WOLFSRC/WL_DRAW.C#L210),
+  -- [DrawScaleds](../../../WOLFSRC/WL_DRAW.C#L1072), and
+  -- [ScaleShape](../../../WOLFSRC/WL_SCALE.C#L421). Camera coordinates, painter
+  -- order, and wall clipping survive; rotation tables and compiled scalers do not.
   forM_ sprites $ \(depth,lateral,sprite,generic) -> when (depth>0.1) $ do
     let size = min 2000 (floor (160/depth))
         centerX = floor (160 + 160*lateral/(0.66*depth))
@@ -76,6 +85,9 @@ renderWith graphics w = runSTUArray $ do
             when (color/=0) (pixel x y color)
           Nothing -> when (generic && (headShape || body || legs)) $ pixel x y
             (if headShape then rgb 207 162 116 else if legs then rgb 45 42 38 else rgb 123 103 54)
+  -- C reference: [DrawPlayerWeapon](../../../WOLFSRC/WL_DRAW.C#L1201).
+  -- The original selects a weapon animation frame and calls SimpleScaleShape;
+  -- this edition selects only pistol-ready or muzzle-flash artwork.
   case graphics >>= M.lookup (if muzzle w>0 then 423 else 421) . spritePictures of
     Just pistol -> forM_ [0..127] $ \y -> forM_ [0..127] $ \x -> do
       let color = pictureAt pistol (x `div` 2) (y `div` 2)
@@ -110,6 +122,9 @@ renderWith graphics w = runSTUArray $ do
     rays = [castRay w (player w) (add f (scale (0.66*(2*(fromIntegral x+0.5)/320-1)) right))
            | x<-[0::Int ..319]]
     depths = listArray (0,319) (map hitDistance rays)
+    -- Texture-index references: [SetupWalls](../../../WOLFSRC/WL_MAIN.C#L706)
+    -- and [HitHorizDoor](../../../WOLFSRC/WL_DRAW.C#L620). Paired wall faces and
+    -- door-page variants use the original resource numbering.
     wallPicture h = do
       media <- graphics
       codes <- wallCodes (level w)
@@ -123,6 +138,9 @@ renderWith graphics w = runSTUArray $ do
       | guardMode g==Dead = maybe (guardSprite g) fst (lookup (guardSprite g) states)
       | guardCooldown g>1.05 = maybe (guardSprite g) snd (lookup (guardSprite g) states)
       | otherwise = guardSprite g
+    -- Data reference: [guard state table](../../../WOLFSRC/WL_ACT2.C#L418)
+    -- and the [sprite enum](../../../WOLFSRC/WL_DEF.H#L160). These IDs select
+    -- standing/shooting/dead artwork; they do not port the original animation graph.
     states = [(50,(95,96)),(99,(134,135)),(138,(183,184)),(188,(233,234)),
               (238,(284,285)),(296,(303,300)),(307,(316,311)),(319,(333,327)),
               (334,(341,338)),(360,(369,364)),(385,(392,389)),(395,(407,400))]

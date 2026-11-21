@@ -21,6 +21,9 @@ data MapData = MapData
   { mapName :: !String, mapWidth :: !Int, mapHeight :: !Int
   , mapPlanes :: ![[Int]] } deriving (Eq, Show)
 
+-- File-format reference: [CAL_SetupMapFile](../../../WOLFSRC/ID_CA.C#L942).
+-- The original opens edition-specific files and allocates segmented buffers;
+-- we read ByteStrings and leave edition discovery to Wolf.Pack.
 readMapFiles :: FilePath -> IO (Either String (B.ByteString, B.ByteString))
 readMapFiles dir = do
   found <- findPack dir
@@ -31,6 +34,8 @@ readMapFiles dir = do
       game <- readResource pack "GAMEMAPS"
       pure ((,) <$> header <*> game)
 
+-- C reference: [CAL_SetupMapFile](../../../WOLFSRC/ID_CA.C#L942), specifically
+-- its headeroffsets loop and sparse-map sentinel. The public API is one-based.
 availableMaps :: B.ByteString -> Either String [Int]
 availableMaps header = do
   check (B.length header == 402) "MAPHEAD must contain a tag and 100 offsets (402 bytes)"
@@ -40,6 +45,9 @@ availableMaps header = do
 -- | First compression layer. The first word is the expanded BYTE count.
 -- A7 = near copy, A8 = far copy. A zero count escapes a literal tag word.
 -- Copies are deliberately incremental: backreferences may overlap their output.
+-- Algorithm reference: [CAL_CarmackExpand](../../../WOLFSRC/ID_CA.C#L609).
+-- Near/far copies and escaped tag bytes follow that codec; checked cursors and
+-- an incrementally extended Sequence replace unchecked source/destination pointers.
 carmackExpand :: B.ByteString -> Either String [Int]
 carmackExpand bytes = do
   size <- word16 bytes 0
@@ -72,6 +80,8 @@ carmackExpand bytes = do
 
 -- | Second compression layer: tag, count, value. Its first word is again an
 -- expanded byte count, which must agree with the validated map dimensions.
+-- Algorithm reference: [CA_RLEWexpand](../../../WOLFSRC/ID_CA.C#L734).
+-- The marker/count/value format is preserved, with explicit output-size checks.
 rlewExpand :: Int -> Int -> [Int] -> Either String [Int]
 rlewExpand tag cells input = do
   check (cells>0 && cells<=4096) "Invalid RLEW cell count"
@@ -91,7 +101,10 @@ rlewExpand tag cells input = do
           _ -> Left "Truncated RLEW run"
 
 -- | Map numbers are one-based, matching the CLI. This edition supports the
--- shipped 64x64 WL1 format; incompatible formats are rejected explicitly.
+-- shipped 64x64 WL1/WL6 format; incompatible formats are rejected explicitly.
+-- C references: [CA_CacheMap](../../../WOLFSRC/ID_CA.C#L1428) for the two
+-- decompression stages and [maptype](../../../WOLFSRC/ID_CA.H#L17) for layout.
+-- The original skips the inner size word; we verify it against map dimensions.
 decodeMap :: B.ByteString -> B.ByteString -> Int -> Either String MapData
 decodeMap header game number = do
   present <- availableMaps header
@@ -114,8 +127,13 @@ decodeMap header game number = do
   pure (MapData (map (chr . fromIntegral) (B.unpack (B.takeWhile (/=0) nameBytes))) width height planes)
 
 -- | Explicit compatibility policy: preserve geometry and easy-difficulty actor
--- positions, but use the teaching engine's one guard kind and unlocked doors.
--- Decorations, pickups, patrol arrows, and pushwall behavior are not translated.
+-- positions and sprite identities, but use simplified guard behavior and unlocked
+-- doors. Decorations/pickups are visible; their effects, patrols, and pushwalls
+-- are not simulated.
+-- C references: [SetupGameLevel](../../../WOLFSRC/WL_GAME.C#L625) interprets
+-- geometry and doors; [ScanInfoPlane](../../../WOLFSRC/WL_GAME.C#L221) dispatches
+-- object IDs. [SpawnPlayer](../../../WOLFSRC/WL_AGENT.C#L1100) supplies facing.
+-- We preserve resource IDs/positions but substitute simplified actor behavior.
 toLevel :: MapData -> Either String Level
 toLevel raw = do
   let width = mapWidth raw
