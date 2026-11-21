@@ -5,7 +5,7 @@ Haskell teaching edition
 -----------------------
 
 This branch adds a playable, documented Haskell learning implementation in
-``haskell/``. Start with `haskell/README.md <haskell/README.md>`_ for build
+``haskell/``. Start with `README.md <README.md>`_ for build
 instructions, controls, a design walkthrough, and Haskell tradeoffs. It supports
 an original demo level or local WL1/WL6 assets with original graphics and audio;
 it is not a compatible port
