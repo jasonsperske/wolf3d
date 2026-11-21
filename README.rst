@@ -6,8 +6,9 @@ Haskell teaching edition
 
 This branch adds a playable, documented Haskell learning implementation in
 ``haskell/``. Start with `haskell/README.md <haskell/README.md>`_ for build
-instructions, controls, a design walkthrough, and Haskell tradeoffs. It uses
-an original demo level and procedural graphics; it is not a compatible port
+instructions, controls, a design walkthrough, and Haskell tradeoffs. It supports
+an original demo level or the shareware WL1 maps, with procedural graphics;
+it is not a compatible port
 or a reconstruction of Carmack's unreleased experiment. The historical source
 release below is preserved.
 

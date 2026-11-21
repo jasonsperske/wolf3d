@@ -9,7 +9,7 @@ common core
   ghc-options: -Wall -Wcompat -O2
   hs-source-dirs: src
   build-depends: base >=4.14 && <5, array >=0.5 && <0.6, containers >=0.6 && <0.9, bytestring >=0.10 && <0.13
-  other-modules: Wolf.Types, Wolf.Level, Wolf.Raycast, Wolf.Simulation, Wolf.Render
+  other-modules: Wolf.Assets, Wolf.Types, Wolf.Level, Wolf.Raycast, Wolf.Simulation, Wolf.Render
 
 executable wolf-haskell
   import: core
@@ -24,3 +24,9 @@ test-suite core-tests
   type: exitcode-stdio-1.0
   hs-source-dirs: test
   main-is: Main.hs
+
+test-suite asset-tests
+  import: core
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: AssetMain.hs

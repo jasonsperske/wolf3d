@@ -45,7 +45,7 @@ uint32_t platform_input(void) {
 int platform_present(const uint32_t *pixels, int state, int hp, int remaining) {
     char title[256];
     SDL_snprintf(title, sizeof title, "Haskell Wolf | Health %d | Guards %d | %s | WASD / arrows / E / Space / R / Esc",
-        hp, remaining, state == 1 ? "ESCAPED! R to restart" : state == 2 ? "DEFEATED - R to restart" : "Find the green exit on the map");
+        hp, remaining, state == 1 ? "ESCAPED! R to restart" : state == 2 ? "DEFEATED - R to restart" : "Find green exit / E at elevator");
     SDL_SetWindowTitle(window, title);
     if (SDL_UpdateTexture(texture, NULL, pixels, 320 * sizeof(uint32_t)) != 0) return 0;
     if (SDL_RenderClear(renderer) != 0) return 0;

@@ -48,6 +48,8 @@ moveBody w p@(Vec x y) (Vec dx dy) =
 
 openDoor :: Input -> World -> World
 openDoor input w
+  | use input && hitDistance h < 1.35 && tileAt (level w) (hitCell h) == Elevator =
+      w { outcome = Won }
   | use input && hitDistance h < 1.35 && tileAt (level w) (hitCell h) == Door =
       w { doors = M.insertWith (\_ existing -> existing) (hitCell h) (Opening 0) (doors w) }
   | otherwise = w
@@ -73,6 +75,7 @@ shoot input w
 -- Pure traversal returns both the updated guards and their total damage.
 -- AI deliberately uses direct pursuit, not a hidden pathfinding subsystem.
 updateGuards :: Double -> World -> World
+updateGuards _ w | outcome w /= Playing = w
 updateGuards dt w = w { guards = map fst results, health = health w-sum (map snd results) }
   where
     results = map update (guards w)

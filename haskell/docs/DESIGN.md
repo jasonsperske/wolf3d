@@ -19,7 +19,7 @@ Neither performs IO. They cannot read a keyboard, fetch time, or secretly mutate
 
 One map cell is one world unit. Integer coordinates index tiles; the center of cell `(x,y)` is `(x+0.5,y+0.5)`. Positive x points right/east; positive y points down/south. Angle zero faces east, and increasing the angle turns toward south. `heading a` is `(cos a, sin a)`.
 
-The parser accepts `#` walls, `.` floors, `P` player, `G` guards, `D` or `+` doors, and `E` exits. It rejects uneven rows, unknown characters, open boundaries, incorrect player counts, and missing exits. These checks establish structure, not reachability: a valid map can still contain an unreachable exit. Positions are removed from the tile layer and stored separately.
+The text-map parser accepts `#` walls, `.` floors, `P` player, `G` guards, `D` or `+` doors, and `E` exits. It rejects uneven rows, unknown characters, open boundaries, incorrect player counts, and missing exits. These checks establish structure, not reachability: a valid map can still contain an unreachable exit. Positions are removed from the tile layer and stored separately.
 
 `tileAt` returns a wall outside the map. That single convention makes rays and collision safe at the boundary. Keep production worlds behind the validated constructor if exposing this as a library; the teaching modules currently export record constructors for easy experiments.
 
@@ -80,7 +80,7 @@ These are conceptual correspondences, not claims of algorithmic or behavior comp
 | `WOLFSRC/WL_ACT1.C`: `MoveDoors`, opening states | `DoorState`, `openDoor`, `step` | Algebraic states and whole-tile delayed opening simplify geometry. |
 | `WOLFSRC/WL_STATE.C` and `WL_ACT2.C` | `updateGuards` | Three states and direct pursuit replace the richer actor system. |
 | `WOLFSRC/ID_IN.C`, `ID_VL.C` | `Main`, `platform.c` | SDL owns modern window/input presentation. |
-| `WOLFSRC/ID_CA.C`, `ID_PM.C`, `ID_MM.C` | `Level`, managed arrays | Embedded map and procedural art avoid original asset/cache formats. |
+| `WOLFSRC/ID_CA.C`, `ID_PM.C`, `ID_MM.C` | `Level`, managed arrays | Text demo or decoded WL1 maps; artwork still procedural. |
 
 The original hardware constraints shaped much of its complexity. Removing DOS, segmented memory, VGA, and asset compatibility explains a large part of the reduction in code. Do not attribute that entire reduction to Haskell.
 
@@ -95,4 +95,4 @@ Add one change at a time and keep the pure interfaces:
 5. Store and replay a list of `Input` values, one per fixed tick. Current display-frame input sampling is not itself an event recording format.
 6. Profile before replacing list-backed guard traversal or the framebuffer copy.
 
-Supporting original maps and resources would be a separate substantial project: binary parsing, decompression, sprite/texture decoding, exact state machines, and compatibility tests. It should build on this core rather than be implied by it.
+Original WL1 map parsing and decompression now live in `Wolf.Assets`; see [the asset-loading walkthrough](ASSET-LOADING.md). Sprite/texture decoding, exact state machines, and full compatibility remain separate extensions.

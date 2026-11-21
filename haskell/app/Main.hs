@@ -10,6 +10,8 @@ import Foreign (Ptr, allocaArray, pokeArray)
 import Foreign.C (CInt(..), CDouble(..), CString, peekCString)
 import System.Environment (getArgs)
 import System.Exit (die)
+import Text.Read (readMaybe)
+import Wolf.Assets
 import Wolf.Types
 import Wolf.Level
 import Wolf.Simulation
@@ -23,18 +25,56 @@ foreign import ccall unsafe "platform_present" platformPresent :: Ptr Word32 -> 
 foreign import ccall unsafe "platform_time" platformTime :: IO CDouble
 foreign import ccall safe "platform_delay" platformDelay :: IO ()
 
+data Mode = Play | Snapshot FilePath | Smoke | ListLevels deriving (Eq)
+data Options = Options (Maybe FilePath) Int Mode
+
+usage :: String
+usage = "Usage: wolf-haskell [--assets DIR [--level 1..100]] [--snapshot FILE | --smoke | --list-levels]"
+
+-- Explicit opt-in keeps the asset-free demo runnable from any working directory.
+parseOptions :: [String] -> Either String Options
+parseOptions = go (Options Nothing 1 Play)
+  where
+    go options [] = Right options
+    go (Options _ n mode) ("--assets":dir:rest) = go (Options (Just dir) n mode) rest
+    go (Options dir _ mode) ("--level":value:rest) = case readMaybe value of
+      Just n | n>=1 && n<=100 -> go (Options dir n mode) rest
+      _ -> Left "--level must be an integer from 1 to 100"
+    go (Options dir n Play) ("--snapshot":path:rest) = go (Options dir n (Snapshot path)) rest
+    go (Options dir n Play) ("--smoke":rest) = go (Options dir n Smoke) rest
+    go (Options dir n Play) ("--list-levels":rest) = go (Options dir n ListLevels) rest
+    go _ _ = Left usage
+
 main :: IO ()
 main = do
   args <- getArgs
-  l <- either die pure demoLevel
-  let w = initialWorld l
-  case args of
-    ["--snapshot",path] -> writePPM path w
-    ["--smoke"] -> withPlatform $ allocaArray (screenWidth*screenHeight) $ \buffer -> present buffer w
-    [] -> withPlatform $ allocaArray (screenWidth*screenHeight) $ \buffer -> do
-      t <- realToFrac <$> platformTime
-      loop buffer w w t 0
-    _ -> die "Usage: wolf-haskell [--snapshot output.ppm | --smoke]"
+  if args==["--help"] then putStrLn usage else do
+    Options directory number mode <- either die pure (parseOptions args)
+    case directory of
+      Nothing | mode==ListLevels || "--level" `elem` args -> die "--list-levels and --level require --assets DIR"
+      Nothing -> either die (runMode mode . initialWorld) demoLevel
+      Just dir -> do
+        (header,game) <- readMapFiles dir >>= either die pure
+        case mode of
+          ListLevels -> do
+            numbers <- either die pure (availableMaps header)
+            mapM_ (\n -> do
+              raw <- either die pure (decodeMap header game n)
+              putStrLn (show n++": "++mapName raw++" ("++show (mapWidth raw)++"x"++show (mapHeight raw)++")")) numbers
+          _ -> do
+            raw <- either die pure (decodeMap header game number)
+            l <- either die pure (toLevel raw)
+            putStrLn ("Loaded "++mapName raw++"; procedural graphics and simplified actors. E activates elevators.")
+            runMode mode (initialWorld l)
+
+runMode :: Mode -> World -> IO ()
+runMode mode w = case mode of
+  Snapshot path -> writePPM path w
+  Smoke -> withPlatform $ allocaArray (screenWidth*screenHeight) $ \buffer -> present buffer w
+  Play -> withPlatform $ allocaArray (screenWidth*screenHeight) $ \buffer -> do
+    t <- realToFrac <$> platformTime
+    loop buffer w w t 0
+  ListLevels -> die "--list-levels requires --assets DIR"
   where
     withPlatform = bracket_ acquire platformClose
     acquire = do

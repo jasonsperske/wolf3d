@@ -3,7 +3,7 @@
 module Wolf.Render (render, screenWidth, screenHeight, writePPM) where
 
 import Control.Monad (forM_, when)
-import Data.Array (listArray, (!))
+import Data.Array (listArray, bounds, (!))
 import Data.Array.ST (newArray, writeArray, runSTUArray)
 import Data.Array.Unboxed (UArray, elems)
 import Data.Bits ((.|.), shiftL, shiftR, (.&.))
@@ -35,12 +35,14 @@ render w = runSTUArray $ do
         height = min 4000 (floor (160/depth))
         top = 100-height `div` 2
         isDoor = tileAt (level w) (hitCell h) == Door
+        isElevator = tileAt (level w) (hitCell h) == Elevator
         shade = (if hitSide h == Vertical then 1 else 0.72) / (1+depth*0.075)
     forM_ [max 0 top..min 199 (top+height)] $ \y -> do
       let u = floor (hitU h*64) :: Int
           v = ((y-top)*64) `div` max 1 height
           mortar = v `mod` 16 < 2 || (u + (v `div` 16 `mod` 2)*16) `mod` 32 < 2
-          (r,g,b) | isDoor = if u `mod` 16 < 2 then (60,44,25) else (157,112,48)
+          (r,g,b) | isElevator = (40,190,80)
+                  | isDoor = if u `mod` 16 < 2 then (60,44,25) else (157,112,48)
                   | mortar = (55,57,61)
                   | otherwise = (128,139,150)
       pixel x y (rgb (floor (r*shade)) (floor (g*shade)) (floor (b*shade)))
@@ -71,14 +73,17 @@ render w = runSTUArray $ do
   rect 160 96 1 9 (rgb 230 230 220)
   rect 7 187 104 9 (rgb 20 20 20)
   rect 9 189 (max 0 (health w)) 5 (rgb 175 40 35)
-  forM_ [0..15] $ \x -> forM_ [0..12] $ \y ->
-    rect (5+x*3) (5+y*3) 3 3 (case tileAt (level w) (x,y) of
+  let ((minX,minY),(maxX,maxY)) = bounds (tiles (level w))
+      mapScale = max 1 (min 3 (64 `div` max (maxX-minX+1) (maxY-minY+1)))
+  forM_ [minX..maxX] $ \x -> forM_ [minY..maxY] $ \y ->
+    rect (5+(x-minX)*mapScale) (5+(y-minY)*mapScale) mapScale mapScale (case tileAt (level w) (x,y) of
       Wall -> rgb 120 125 130
       Door -> if solidAt w (x,y) then rgb 165 115 40 else rgb 50 70 50
+      Elevator -> rgb 40 210 90
       Exit -> rgb 40 210 90
       Floor -> rgb 25 27 30)
   let Vec px py = player w
-  rect (5+floor (px*3)) (5+floor (py*3)) 2 2 (rgb 255 250 180)
+  rect (5+floor ((px-fromIntegral minX)*fromIntegral mapScale)) (5+floor ((py-fromIntegral minY)*fromIntegral mapScale)) 2 2 (rgb 255 250 180)
   when (outcome w /= Playing) $
     rect 112 8 96 6 (if outcome w==Won then rgb 40 220 80 else rgb 230 40 40)
   pure buffer

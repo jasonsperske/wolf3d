@@ -22,8 +22,9 @@ heading a = Vec (cos a) (sin a)
 cell :: Vec -> (Int,Int)
 cell (Vec x y) = (floor x, floor y)
 
-data Tile = Floor | Wall | Door | Exit deriving (Eq, Show)
+data Tile = Floor | Wall | Door | Exit | Elevator deriving (Eq, Show)
 data Level = Level { tiles :: !(Array (Int,Int) Tile), spawn :: !Vec,
+                     spawnAngle :: !Double,
                      guardSpawns :: ![Vec] } deriving (Eq, Show)
 -- Progress lives inside the state that needs it. Open doors never have a
 -- nonsensical animation fraction. Doors stay open in this teaching edition.
