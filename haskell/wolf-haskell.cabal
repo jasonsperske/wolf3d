@@ -1,0 +1,41 @@
+cabal-version: 2.4
+name: wolf-haskell
+version: 0.1.0.0
+synopsis: A readable Wolfenstein-style Haskell teaching engine
+build-type: Simple
+extra-source-files: vendor/nuked-opl3/opl3.h, vendor/nuked-opl3/opl3.c, vendor/nuked-opl3/LICENSE
+
+common core
+  default-language: Haskell2010
+  ghc-options: -Wall -Wcompat -O2
+  hs-source-dirs: src
+  build-depends: base >=4.14 && <5, array >=0.5 && <0.6, containers >=0.6 && <0.9, bytestring >=0.10 && <0.13, directory >=1.3 && <1.4, filepath >=1.4 && <1.6
+  other-modules: Wolf.Binary, Wolf.Pack, Wolf.Palette, Wolf.Media, Wolf.Audio, Wolf.Assets, Wolf.Types, Wolf.Level, Wolf.Raycast, Wolf.Simulation, Wolf.Render
+
+executable wolf-haskell
+  import: core
+  hs-source-dirs: app
+  main-is: Main.hs
+  other-modules: Wolf.Playback
+  c-sources: cbits/platform.c, cbits/audio.c
+  include-dirs: vendor/nuked-opl3
+  pkgconfig-depends: sdl2 >=2.0
+  ghc-options: -rtsopts
+
+test-suite core-tests
+  import: core
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Main.hs
+
+test-suite asset-tests
+  import: core
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: AssetMain.hs
+
+test-suite media-tests
+  import: core
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: MediaMain.hs

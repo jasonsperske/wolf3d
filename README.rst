@@ -1,6 +1,17 @@
 Wolfenstein 3D
 ==============
 
+Haskell teaching edition
+-----------------------
+
+This branch adds a playable, documented Haskell learning implementation in
+``haskell/``. Start with `README.md <README.md>`_ for build
+instructions, controls, a design walkthrough, and Haskell tradeoffs. It supports
+an original demo level or local WL1/WL6 assets with original graphics and audio;
+it is not a compatible port
+or a reconstruction of Carmack's unreleased experiment. The historical source
+release below is preserved.
+
 The original source release was made using the ``DEICE.EXE``
 installer (DeIce) in the root directory.  (Basically a way to
 split self-extracting zip files over multiple floppy disks.)
